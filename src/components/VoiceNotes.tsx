@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Mic, MicOff, Trash2, Edit2, Save, Sun, Moon, Download, Hash, Search, FileText } from 'lucide-react';
+import { Mic, MicOff, Trash2, Edit2, Save, Sun, Moon, Download, Hash, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
@@ -79,17 +79,29 @@ export function VoiceNotes() {
 
   useEffect(() => {
     if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      setRecognition(recognition);
+      try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          const current = event.resultIndex;
+          const transcript = event.results[current][0].transcript;
+          setTranscript((prev) => prev + ' ' + transcript);
+        };
 
-      recognition.onresult = (event) => {
-        const current = event.resultIndex;
-        const transcript = event.results[current][0].transcript;
-        setTranscript((prev) => prev + ' ' + transcript);
-      };
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event);
+          setIsRecording(false);
+        };
+
+        setRecognition(recognition);
+      } catch (error) {
+        console.error('Failed to initialize speech recognition:', error);
+      }
+    } else {
+      console.warn('Speech recognition not supported in this browser');
     }
   }, []);
 
@@ -242,6 +254,16 @@ export function VoiceNotes() {
 
   if (!user) {
     return <LoginPage onLogin={() => {}} />;
+  }
+
+  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-red-600">
+          Speech recognition is not supported in your browser. Please use Chrome or Edge.
+        </p>
+      </div>
+    );
   }
 
   return (
